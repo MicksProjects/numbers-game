@@ -23,14 +23,16 @@ export function MultiplayerGame({
   const isPlayer1 = room.player1_id === userId
   const myNum = isPlayer1 ? 1 : 2
   const opponentNum = isPlayer1 ? 2 : 1
-
   const myGuesses = room[`player${myNum}_guesses`] || []
-  const opponentGuesses = room[`player${opponentNum}_guesses`] || []
   const myTurn = room.turn === myNum
   const mySecret = isPlayer1 ? room.player1_secret : room.player2_secret
   const opponentSecretReady = isPlayer1
     ? !!room.player2_secret
     : !!room.player1_secret
+
+  const opponentGuesses = useMemo(() => {
+    return room[`player${opponentNum}_guesses`] || []
+  }, [room, opponentNum])
 
   const opponentLastGuess = useMemo(() => {
     const last = opponentGuesses[opponentGuesses.length - 1]
