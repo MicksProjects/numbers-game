@@ -19,10 +19,10 @@ export function SecretEntry({
   const handleChange = (v: string) => setValue(v.replace(/[^0-9]/g, ""))
 
   return (
-    <Card className="w-full max-w-sm mx-auto mt-10 p-6 text-center space-y-4">
+    <Card className="w-full max-w-sm mx-auto p-6 text-center space-y-4">
       <CardHeader>
         <CardTitle className="text-xl font-bold">
-          Enter Your Secret Number
+          Enter your secret code
         </CardTitle>
       </CardHeader>
 

@@ -66,10 +66,10 @@ export function MultiplayerGame({
   }
 
   return (
-    <Card className="w-full max-w-sm mx-auto mt-10 p-5 shadow-lg rounded-2xl">
+    <Card className="w-full max-w-sm mx-auto p-5 shadow-lg rounded-2xl">
       <CardContent className="space-y-6">
         {/* ===== Turn Indicator ===== */}
-        <div className="flex flex-col items-center text-center space-y-2">
+        <div className="flex items-center text-center justify-between border-b pb-4">
           <div className="flex items-center justify-center gap-2">
             <div
               className={`h-3 w-3 rounded-full animate-pulse ${
@@ -81,33 +81,35 @@ export function MultiplayerGame({
                 myTurn ? "text-green-600" : "text-orange-600"
               }`}
             >
-              {myTurn ? "Your Turn" : "Opponent's Turn"}
+              {myTurn ? "Your turn" : "Their turn"}
             </p>
           </div>
 
           {mySecret && (
             <Badge
               variant="secondary"
-              className="mt-1 bg-muted text-muted-foreground text-sm px-3 py-1 rounded-lg"
+              className="bg-green-600/10 text-muted-foreground text-sm px-3 py-1 rounded-lg"
             >
-              Your Secret:{" "}
-              <span className="font-mono ml-1 text-foreground">{mySecret}</span>
+              Your code: <span className="f">{mySecret}</span>
             </Badge>
           )}
         </div>
 
-        {/* ===== Opponent's Last Guess ===== */}
+        {/* ===== Opponent's Last Guess (compact inline) ===== */}
         {opponentSecretReady && opponentLastGuess && (
-          <div className="bg-muted/50 border rounded-xl py-3 px-4 text-center shadow-sm w-4/5 mx-auto">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-              Opponent’s Last Guess
-            </p>
-            <p className="font-mono text-xl font-semibold text-foreground">
-              {opponentLastGuess.guess}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {opponentLastGuess.correct}/4 correct
-            </p>
+          <div className="flex items-center justify-between  py-2 px-4 w-full text-sm">
+            {/* Left: Label */}
+            <span className="text-xs text-muted-foreground font-medium tracking-wide">
+              Their last guess
+            </span>
+
+            {/* Right: Guess + Correct */}
+            <div className="flex text-muted-foreground items-baseline gap-2">
+              <span>{opponentLastGuess.guess}</span>
+              <span className="text-xs text-muted-foreground font-medium">
+                {opponentLastGuess.correct}/4
+              </span>
+            </div>
           </div>
         )}
 
@@ -149,11 +151,11 @@ export function MultiplayerGame({
         {/* ===== Guess History ===== */}
         {opponentSecretReady && (
           <div className="pt-4 border-t text-center">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+            <h3 className="text-sm font-semibold tracking-wide text-muted-foreground mb-3">
               Your Guesses
             </h3>
 
-            <div className="max-h-48 overflow-y-auto space-y-1">
+            <div className="max-h-48 overflow-y-auto space-y-2 px-1">
               {myGuesses.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No guesses yet.</p>
               ) : (
@@ -163,10 +165,22 @@ export function MultiplayerGame({
                   .map((g, i) => (
                     <div
                       key={i}
-                      className="flex justify-between py-1 text-base font-mono border-b last:border-none"
+                      className="flex justify-between items-center bg-muted/40 px-3"
                     >
-                      <span>{g.guess}</span>
-                      <span className="text-muted-foreground">
+                      {/* spaced-out digits like OTP slots */}
+                      <div className="flex justify-center gap-2 text-lg font-semibold text-foreground">
+                        {g.guess.split("").map((digit, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-block w-2 text-center"
+                          >
+                            {digit}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* correct count */}
+                      <span className="text-xs text-muted-foreground ml-2 font-medium">
                         {g.correct}/4
                       </span>
                     </div>

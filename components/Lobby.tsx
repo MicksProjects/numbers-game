@@ -104,7 +104,7 @@ export function Lobby({
   }
 
   return (
-    <Card className="w-full max-w-sm mx-auto mt-10 p-6 text-center">
+    <Card className="w-full max-w-sm mx-auto p-6 text-center">
       <CardHeader>
         <CardTitle className="text-2xl font-bold">Join a Room</CardTitle>
       </CardHeader>
