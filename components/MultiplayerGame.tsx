@@ -61,7 +61,7 @@ export function MultiplayerGame({
         </CardTitle>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="flex flex-col justify-center items-center w-full">
         {!opponentSecretReady ? (
           <p className="text-muted-foreground">
             Waiting for opponent to set their secret...

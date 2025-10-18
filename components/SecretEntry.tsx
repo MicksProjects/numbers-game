@@ -26,7 +26,7 @@ export function SecretEntry({
         </CardTitle>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="flex flex-col justify-center items-center w-full">
         <InputOTP maxLength={4} value={value} onChange={handleChange}>
           <InputOTPGroup>
             {[0, 1, 2, 3].map((i) => (

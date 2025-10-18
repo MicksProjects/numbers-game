@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { Lobby } from "@/components/Lobby"
 import { SecretEntry } from "@/components/SecretEntry"
@@ -35,36 +35,6 @@ export default function PlayPage() {
   const [hasSecret, setHasSecret] = useState(false)
   const [gameOver, setGameOver] = useState(false)
 
-  // Subscribe to room updates
-  useEffect(() => {
-    if (!roomId) return
-    const channel = supabase
-      .channel(`room-${roomId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "rooms",
-          filter: `id=eq.${roomId}`,
-        },
-        (payload) => {
-          const updated = payload.new as Room
-          setRoom(updated)
-
-          // ✅ detect winner
-          if (updated.winner !== null) {
-            setGameOver(true)
-          }
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [roomId])
-
   const handleJoin = async (id: string, host: boolean) => {
     setIsHost(host)
     const { data, error } = await supabase
@@ -98,13 +68,65 @@ export default function PlayPage() {
     setHasSecret(true)
   }
 
-  const handleExitToLobby = () => {
+  const handleExitToLobby = useCallback(async () => {
+    if (roomId) {
+      await supabase.from("rooms").delete().eq("id", roomId)
+    }
     // Reset all game state
     setRoom(undefined)
     setRoomId(undefined)
     setHasSecret(false)
     setGameOver(false)
-  }
+  }, [roomId])
+
+  // inside PlayPage
+  useEffect(() => {
+    const handleBeforeUnload = async () => {
+      if (roomId) {
+        await supabase.from("rooms").delete().eq("id", roomId)
+      }
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload)
+    }
+  }, [roomId])
+
+  useEffect(() => {
+    if (!roomId) return
+
+    const channel = supabase
+      .channel(`room-${roomId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "rooms",
+          filter: `id=eq.${roomId}`,
+        },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            console.log("Room deleted — opponent left or game ended.")
+            handleExitToLobby()
+            return
+          }
+
+          const updated = payload.new as Room
+          setRoom(updated)
+          if (updated.winner !== null) {
+            setGameOver(true)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [handleExitToLobby, roomId])
 
   // Flow
   if (!roomId) return <Lobby onJoin={handleJoin} />

@@ -1,6 +1,7 @@
 import { ThemeProvider } from "@/components/ThemeProvider"
 import "./globals.css"
 import { SiteNavbar } from "@/components/Navbar"
+import { Toaster } from "@/components/ui/sonner"
 
 export default function RootLayout({
   children,
@@ -18,8 +19,9 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
+            <Toaster />
             <SiteNavbar />
-            {children}
+            <div className="p-4">{children}</div>
           </ThemeProvider>
         </body>
       </html>
