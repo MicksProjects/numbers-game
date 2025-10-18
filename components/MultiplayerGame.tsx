@@ -1,14 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp"
+import { Badge } from "@/components/ui/badge"
 import { Room } from "@/app/page"
 
 export function MultiplayerGame({
@@ -21,11 +22,20 @@ export function MultiplayerGame({
   const [value, setValue] = useState("")
   const isPlayer1 = room.player1_id === userId
   const myNum = isPlayer1 ? 1 : 2
+  const opponentNum = isPlayer1 ? 2 : 1
+
   const myGuesses = room[`player${myNum}_guesses`] || []
+  const opponentGuesses = room[`player${opponentNum}_guesses`] || []
   const myTurn = room.turn === myNum
+  const mySecret = isPlayer1 ? room.player1_secret : room.player2_secret
   const opponentSecretReady = isPlayer1
     ? !!room.player2_secret
     : !!room.player1_secret
+
+  const opponentLastGuess = useMemo(() => {
+    const last = opponentGuesses[opponentGuesses.length - 1]
+    return last ? last : null
+  }, [opponentGuesses])
 
   const handleChange = (v: string) => setValue(v.replace(/[^0-9]/g, ""))
 
@@ -54,52 +64,114 @@ export function MultiplayerGame({
   }
 
   return (
-    <Card className="w-full max-w-sm mx-auto mt-10 p-6 text-center space-y-4">
-      <CardHeader>
-        <CardTitle className="text-2xl font-bold">
-          {myTurn ? "Your Turn" : "Waiting for Opponent..."}
-        </CardTitle>
-      </CardHeader>
+    <Card className="w-full max-w-sm mx-auto mt-10 p-5 shadow-lg rounded-2xl">
+      <CardContent className="space-y-6">
+        {/* ===== Turn Indicator ===== */}
+        <div className="flex flex-col items-center text-center space-y-2">
+          <div className="flex items-center justify-center gap-2">
+            <div
+              className={`h-3 w-3 rounded-full animate-pulse ${
+                myTurn ? "bg-green-500" : "bg-orange-500"
+              }`}
+            />
+            <p
+              className={`font-semibold text-base ${
+                myTurn ? "text-green-600" : "text-orange-600"
+              }`}
+            >
+              {myTurn ? "Your Turn" : "Opponent's Turn"}
+            </p>
+          </div>
 
-      <CardContent className="flex flex-col justify-center items-center w-full">
-        {!opponentSecretReady ? (
-          <p className="text-muted-foreground">
-            Waiting for opponent to set their secret...
-          </p>
-        ) : (
-          <>
-            <InputOTP maxLength={4} value={value} onChange={handleChange}>
-              <InputOTPGroup>
-                {[0, 1, 2, 3].map((i) => (
-                  <InputOTPSlot
-                    key={i}
-                    index={i}
-                    className="w-14 h-16 text-2xl border-1"
-                  />
-                ))}
-              </InputOTPGroup>
-            </InputOTP>
+          {mySecret && (
+            <Badge
+              variant="secondary"
+              className="mt-1 bg-muted text-muted-foreground text-sm px-3 py-1 rounded-lg"
+            >
+              Your Secret:{" "}
+              <span className="font-mono ml-1 text-foreground">{mySecret}</span>
+            </Badge>
+          )}
+        </div>
+
+        {/* ===== Opponent's Last Guess ===== */}
+        {opponentSecretReady && opponentLastGuess && (
+          <div className="bg-muted/50 border rounded-xl py-3 px-4 text-center shadow-sm w-4/5 mx-auto">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+              Opponent’s Last Guess
+            </p>
+            <p className="font-mono text-xl font-semibold text-foreground">
+              {opponentLastGuess.guess}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {opponentLastGuess.correct}/4 correct
+            </p>
+          </div>
+        )}
+
+        {/* ===== Guess Input ===== */}
+        {opponentSecretReady ? (
+          <div className="flex flex-col gap-6">
+            <div className="flex justify-center ">
+              <InputOTP maxLength={4} value={value} onChange={handleChange}>
+                <InputOTPGroup>
+                  {[0, 1, 2, 3].map((i) => (
+                    <InputOTPSlot
+                      key={i}
+                      index={i}
+                      className="w-14 h-16 text-2xl border-1"
+                    />
+                  ))}
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
 
             <Button
               onClick={makeGuess}
               disabled={!myTurn || value.length < 4}
-              className="w-full mt-4 h-12 text-lg rounded-xl"
+              className={`w-4/5 h-12 text-lg rounded-xl font-semibold mx-auto ${
+                myTurn
+                  ? ""
+                  : "bg-muted text-muted-foreground cursor-not-allowed"
+              }`}
             >
-              Guess
+              {myTurn ? "Submit Guess" : "Waiting..."}
             </Button>
+          </div>
+        ) : (
+          <p className="text-center text-muted-foreground">
+            Waiting for opponent to set their secret...
+          </p>
+        )}
 
-            <div className="mt-6 text-left max-h-64 overflow-y-auto">
-              {myGuesses.toReversed().map((g, i) => (
-                <div
-                  key={i}
-                  className="flex justify-between border-b py-1 font-mono"
-                >
-                  <span>{g.guess}</span>
-                  <span className="text-muted-foreground">{g.correct}/4</span>
-                </div>
-              ))}
+        {/* ===== Guess History ===== */}
+        {opponentSecretReady && (
+          <div className="pt-4 border-t text-center">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+              Your Guesses
+            </h3>
+
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              {myGuesses.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No guesses yet.</p>
+              ) : (
+                myGuesses
+                  .slice()
+                  .reverse()
+                  .map((g, i) => (
+                    <div
+                      key={i}
+                      className="flex justify-between py-1 text-base font-mono border-b last:border-none"
+                    >
+                      <span>{g.guess}</span>
+                      <span className="text-muted-foreground">
+                        {g.correct}/4
+                      </span>
+                    </div>
+                  ))
+              )}
             </div>
-          </>
+          </div>
         )}
       </CardContent>
     </Card>
