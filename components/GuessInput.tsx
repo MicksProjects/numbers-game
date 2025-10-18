@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import {
   InputOTP,
   InputOTPGroup,
@@ -34,14 +34,6 @@ export default function NumberGuessGame() {
   const secret = useRef(
     Math.floor(1000 + Math.random() * 9000).toString()
   ).current
-
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [guesses])
 
   const handleChange = (val: string) => {
     const numeric = val.replace(/[^0-9]/g, "")
@@ -113,11 +105,8 @@ export default function NumberGuessGame() {
             </div>
           )}
 
-          <div
-            ref={scrollRef}
-            className="mt-6 max-h-64 overflow-y-auto scroll-smooth"
-          >
-            {guesses.map((g, i) => (
+          <div className="mt-6 max-h-64 overflow-y-auto scroll-smooth">
+            {guesses.toReversed().map((g, i) => (
               <div
                 key={i}
                 className="flex justify-between py-2 border-b text-base font-mono"
