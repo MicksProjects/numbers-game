@@ -132,7 +132,7 @@ export function Lobby({
                 </p>
               </div>
 
-              {room.player1_id !== userId ? (
+              {room.player1_id !== userId && room.player2_id !== userId ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -158,7 +158,7 @@ export function Lobby({
         {/* Create room */}
         <div className="space-y-2">
           <Input
-            placeholder="Enter a room name"
+            placeholder="Enter a room name..."
             value={roomName}
             onChange={(e) => setRoomName(e.target.value)}
           />

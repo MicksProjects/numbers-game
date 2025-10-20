@@ -69,34 +69,83 @@ export function MultiplayerGame({
   }
 
   const leaveGame = async () => {
-    const column = isPlayer1 ? "player1_id" : "player2_id"
+    try {
+      const isHost = room.player1_id === userId
+      const isGuest = room.player2_id === userId
 
-    const { data: updatedRoom, error } = await supabase
-      .from("rooms")
-      .update({ [column]: null })
-      .eq("id", room.id)
-      .select()
-      .single()
+      if (!isHost && !isGuest) return
 
-    if (error) {
-      toast.error("Failed to leave the game.")
-      return
-    }
+      let updatePayload: Record<string, unknown> = {}
 
-    // if both players left -> delete the room
-    if (!updatedRoom.player1_id && !updatedRoom.player2_id) {
-      const { error } = await supabase.from("rooms").delete().eq("id", room.id)
+      // 🔹 Host leaves
+      if (isHost) {
+        if (room.player2_id) {
+          // Promote player2 to host, but reset game state
+          updatePayload = {
+            player1_id: room.player2_id,
+            player2_id: null,
+            player1_secret: null, // reset — new host needs to enter
+            player2_secret: null,
+            player1_guesses: [],
+            player2_guesses: [],
+            turn: 1,
+            winner: null,
+          }
+        } else {
+          // No one else → just clear host
+          updatePayload = { player1_id: null }
+        }
+      }
 
-      if (error) {
-        toast.error("Failed to delete the room.")
+      // 🔹 Guest leaves
+      if (isGuest) {
+        // Reset game so host can restart
+        updatePayload = {
+          player2_id: null,
+          player1_secret: null,
+          player2_secret: null,
+          player1_guesses: [],
+          player2_guesses: [],
+          turn: 1,
+          winner: null,
+        }
+      }
+
+      // Apply update
+      const { data: updatedRoom, error: updateError } = await supabase
+        .from("rooms")
+        .update(updatePayload)
+        .eq("id", room.id)
+        .select()
+        .single()
+
+      if (updateError) {
+        toast.error("Failed to leave the game.")
+        console.error(updateError)
         return
       }
-      toast("Room deleted (no players left).")
-    } else {
-      toast("You left the game.")
-    }
 
-    onLeave()
+      // 🔹 Delete room if empty
+      if (!updatedRoom.player1_id && !updatedRoom.player2_id) {
+        const { error: deleteError } = await supabase
+          .from("rooms")
+          .delete()
+          .eq("id", room.id)
+        if (deleteError) {
+          toast.error("Failed to delete the room.")
+          return
+        }
+        toast("Room deleted (no players left).")
+      } else if (isHost && updatedRoom.player1_id && !updatedRoom.player2_id) {
+        toast("You left — opponent became new host and game reset.")
+      } else {
+        toast("You left — game reset.")
+      }
+
+      onLeave()
+    } catch (err) {
+      console.error("Leave game failed:", err)
+    }
   }
 
   return (
@@ -217,7 +266,14 @@ export function MultiplayerGame({
                             </span>
                           ))}
                         </div>
-                        <span className="text-xs text-muted-foreground ml-2 font-medium">
+                        <span
+                          className={
+                            g.correct > 0
+                              ? "text-green-500"
+                              : "text-muted-foreground" +
+                                `text-xs ml-2 font-medium`
+                          }
+                        >
                           {g.correct}/4
                         </span>
                       </div>

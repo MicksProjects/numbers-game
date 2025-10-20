@@ -14,6 +14,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 
 export interface Room {
   id: string
@@ -79,20 +80,77 @@ export default function PlayPage() {
     setGameOver(false)
   }, [roomId])
 
-  // inside PlayPage
   useEffect(() => {
+    if (!roomId || !userId || !room) return
+
     const handleBeforeUnload = async () => {
-      if (roomId) {
-        await supabase.from("rooms").delete().eq("id", roomId)
+      try {
+        const isHost = room.player1_id === userId
+        const isGuest = room.player2_id === userId
+
+        if (!isHost && !isGuest) return
+
+        const baseUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rooms?id=eq.${roomId}`
+        const headers = {
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        }
+
+        let updatedBody = {}
+
+        // 🔹 Case 1: Host leaves
+        if (isHost) {
+          if (room.player2_id) {
+            // Promote player2 -> player1
+            updatedBody = {
+              player1_id: room.player2_id,
+              player2_id: null,
+              player1_secret: room.player2_secret,
+              player2_secret: null,
+              player1_guesses: room.player2_guesses,
+              player2_guesses: [],
+            }
+          } else {
+            // No one else in room
+            updatedBody = { player1_id: null }
+          }
+        }
+
+        // 🔹 Case 2: Guest leaves
+        if (isGuest) {
+          updatedBody = { player2_id: null }
+        }
+
+        // Step 1: update
+        const res = await fetch(baseUrl, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify(updatedBody),
+          keepalive: true,
+        })
+        const updated = await res.json()
+
+        // Step 2: if room empty → delete
+        if (
+          updated?.length > 0 &&
+          !updated[0].player1_id &&
+          !updated[0].player2_id
+        ) {
+          await fetch(baseUrl, {
+            method: "DELETE",
+            headers,
+            keepalive: true,
+          })
+        }
+      } catch (err) {
+        console.warn("⚠️ Failed to handle beforeunload leave", err)
       }
     }
 
     window.addEventListener("beforeunload", handleBeforeUnload)
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload)
-    }
-  }, [roomId])
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+  }, [roomId, userId, room])
 
   useEffect(() => {
     if (!roomId) return
@@ -114,6 +172,23 @@ export default function PlayPage() {
             return
           }
 
+          if (payload.eventType === "UPDATE") {
+            const updated = payload.new as Room
+
+            // Opponent left (you remain)
+            const opponentLeft =
+              (updated.player1_id === null && !isHost) ||
+              (updated.player2_id === null && isHost)
+
+            if (opponentLeft) {
+              toast("Your opponent left — the game has been reset.")
+              setHasSecret(false) // force re-enter secret
+            }
+
+            setRoom(updated)
+            if (updated.winner !== null) setGameOver(true)
+          }
+
           const updated = payload.new as Room
           setRoom(updated)
           if (updated.winner !== null) {
@@ -126,7 +201,7 @@ export default function PlayPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [handleExitToLobby, roomId])
+  }, [handleExitToLobby, isHost, roomId])
 
   // Inside PlayPage component
   useEffect(() => {
