@@ -104,14 +104,14 @@ export function Lobby({
   }
 
   return (
-    <Card className="w-full max-w-sm mx-auto p-6 text-center">
+    <Card className="w-full max-w-sm mx-auto p-6 text-center gap-0">
       <CardHeader>
         <CardTitle className="text-2xl font-bold">Join a Room</CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-4">
         {/* Room list */}
-        <div className="space-y-2 max-h-80 overflow-y-auto border rounded-lg p-2">
+        <div className="space-y-2 max-h-80 overflow-y-auto p-2">
           {rooms.length === 0 && (
             <p className="text-muted-foreground text-sm">
               No open rooms yet. Create one below!
