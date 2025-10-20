@@ -21,7 +21,7 @@ export default function RootLayout({
           >
             <Toaster />
             <SiteNavbar />
-            <div className="p-4">{children}</div>
+            <div className="p-2">{children}</div>
           </ThemeProvider>
         </body>
       </html>

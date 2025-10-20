@@ -128,7 +128,7 @@ export function Lobby({
                   {room.room_name || "Unnamed Room"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Host: {room.player1_id.slice(0, 6)}...
+                  Host: {room.player1_id?.slice(0, 6)}...
                 </p>
               </div>
 

@@ -11,13 +11,16 @@ import {
 } from "@/components/ui/input-otp"
 import { Badge } from "@/components/ui/badge"
 import { Room } from "@/app/page"
+import { toast } from "sonner"
 
 export function MultiplayerGame({
   room,
   userId,
+  onLeave,
 }: {
   room: Room
   userId: string
+  onLeave: () => void
 }) {
   const [value, setValue] = useState("")
   const isPlayer1 = room.player1_id === userId
@@ -65,138 +68,166 @@ export function MultiplayerGame({
     setValue("")
   }
 
+  const leaveGame = async () => {
+    const column = isPlayer1 ? "player1_id" : "player2_id"
+
+    const { data: updatedRoom, error } = await supabase
+      .from("rooms")
+      .update({ [column]: null })
+      .eq("id", room.id)
+      .select()
+      .single()
+
+    if (error) {
+      toast.error("Failed to leave the game.")
+      return
+    }
+
+    // if both players left -> delete the room
+    if (!updatedRoom.player1_id && !updatedRoom.player2_id) {
+      const { error } = await supabase.from("rooms").delete().eq("id", room.id)
+
+      if (error) {
+        toast.error("Failed to delete the room.")
+        return
+      }
+      toast("Room deleted (no players left).")
+    } else {
+      toast("You left the game.")
+    }
+
+    onLeave()
+  }
+
   return (
-    <Card className="w-full max-w-sm mx-auto p-5 shadow-lg rounded-2xl">
-      <CardContent className="space-y-4">
-        {/* ===== Turn Indicator ===== */}
-        <div className="flex items-center text-center justify-between border-b pb-4">
-          <div className="flex items-center justify-center gap-2">
-            <div
-              className={`h-3 w-3 rounded-full animate-pulse ${
-                myTurn ? "bg-green-500" : "bg-orange-500"
-              }`}
-            />
-            <p
-              className={`font-semibold text-base ${
-                myTurn ? "text-green-600" : "text-orange-600"
-              }`}
-            >
-              {myTurn ? "Your turn" : "Their turn"}
-            </p>
+    <div className="flex flex-col gap-2">
+      <Button onClick={leaveGame} variant="outline" className="w-32">
+        Leave Game
+      </Button>
+      <Card className="w-full max-w-sm mx-auto p-4 shadow-lg rounded-2xl relative">
+        {/* Leave Game Button */}
+
+        <CardContent className="space-y-4">
+          {/* ===== Turn Indicator ===== */}
+          <div className="flex items-center text-center justify-between border-b pb-4">
+            <div className="flex items-center justify-center gap-2">
+              <div
+                className={`h-3 w-3 rounded-full animate-pulse ${
+                  myTurn ? "bg-green-500" : "bg-orange-500"
+                }`}
+              />
+              <p
+                className={`font-semibold text-base ${
+                  myTurn ? "text-green-600" : "text-orange-600"
+                }`}
+              >
+                {myTurn ? "Your turn" : "Their turn"}
+              </p>
+            </div>
+
+            {mySecret && (
+              <Badge
+                variant="secondary"
+                className="bg-green-600/10 text-muted-foreground text-sm px-3 py-1 rounded-lg"
+              >
+                Your code: <span className="font-mono ml-1">{mySecret}</span>
+              </Badge>
+            )}
           </div>
 
-          {mySecret && (
-            <Badge
-              variant="secondary"
-              className="bg-green-600/10 text-muted-foreground text-sm px-3 py-1 rounded-lg"
-            >
-              Your code: <span className="f">{mySecret}</span>
-            </Badge>
-          )}
-        </div>
-
-        {/* ===== Opponent's Last Guess (compact inline) ===== */}
-        {opponentSecretReady && opponentLastGuess && (
-          <div className="flex items-center justify-between  py-2 px-4 w-full text-sm">
-            {/* Left: Label */}
-            <span className="text-xs text-muted-foreground font-medium tracking-wide">
-              Their last guess
-            </span>
-
-            {/* Right: Guess + Correct */}
-            <div className="flex text-muted-foreground items-baseline gap-2">
-              <span>{opponentLastGuess.guess}</span>
-              <span className="text-xs text-muted-foreground font-medium">
-                {opponentLastGuess.correct}/4
+          {/* ===== Opponent's Last Guess ===== */}
+          {opponentSecretReady && opponentLastGuess && (
+            <div className="flex items-center justify-between py-2 px-4 w-full text-sm">
+              <span className="text-xs text-muted-foreground font-medium tracking-wide">
+                Their last guess
               </span>
+
+              <div className="flex text-muted-foreground items-baseline gap-2">
+                <span>{opponentLastGuess.guess}</span>
+                <span className="text-xs text-muted-foreground font-medium">
+                  {opponentLastGuess.correct}/4
+                </span>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ===== Guess Input ===== */}
-        {opponentSecretReady ? (
-          <div className="flex flex-col gap-6">
-            <div className="flex justify-center ">
-              <InputOTP maxLength={4} value={value} onChange={handleChange}>
-                <InputOTPGroup>
-                  {[0, 1, 2, 3].map((i) => (
-                    <InputOTPSlot
-                      key={i}
-                      index={i}
-                      className="w-14 h-16 text-2xl border-1"
-                    />
-                  ))}
-                </InputOTPGroup>
-              </InputOTP>
+          {/* ===== Guess Input ===== */}
+          {opponentSecretReady ? (
+            <div className="flex flex-col gap-6">
+              <div className="flex justify-center ">
+                <InputOTP maxLength={4} value={value} onChange={handleChange}>
+                  <InputOTPGroup>
+                    {[0, 1, 2, 3].map((i) => (
+                      <InputOTPSlot
+                        key={i}
+                        index={i}
+                        className="w-14 h-16 text-2xl border-1"
+                      />
+                    ))}
+                  </InputOTPGroup>
+                </InputOTP>
+              </div>
+
+              <Button
+                onClick={makeGuess}
+                disabled={!myTurn || value.length < 4}
+                className={`w-4/5 h-12 text-lg rounded-xl font-semibold mx-auto ${
+                  myTurn
+                    ? ""
+                    : "bg-muted text-muted-foreground cursor-not-allowed"
+                }`}
+              >
+                {myTurn ? "Submit Guess" : "Waiting..."}
+              </Button>
             </div>
+          ) : (
+            <p className="text-center text-muted-foreground">
+              Waiting for opponent to set their secret...
+            </p>
+          )}
 
-            <Button
-              onClick={makeGuess}
-              disabled={!myTurn || value.length < 4}
-              className={`w-4/5 h-12 text-lg rounded-xl font-semibold mx-auto ${
-                myTurn
-                  ? ""
-                  : "bg-muted text-muted-foreground cursor-not-allowed"
-              }`}
-            >
-              {myTurn ? "Submit Guess" : "Waiting..."}
-            </Button>
-          </div>
-        ) : (
-          <p className="text-center text-muted-foreground">
-            Waiting for opponent to set their secret...
-          </p>
-        )}
+          {/* ===== Guess History ===== */}
+          {opponentSecretReady && (
+            <div className="pt-4 border-t text-center">
+              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground mb-3">
+                Your Guesses
+              </h3>
 
-        {/* ===== Guess History ===== */}
-        {opponentSecretReady && (
-          <div className="pt-4 border-t text-center">
-            <h3 className="text-sm font-semibold tracking-wide text-muted-foreground mb-3">
-              Your Guesses
-            </h3>
-
-            <div className="max-h-48 overflow-y-auto space-y-2 px-1">
-              {myGuesses.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No guesses yet.</p>
-              ) : (
-                myGuesses
-                  .slice()
-                  .reverse()
-                  .map((g, i) => (
-                    <div
-                      key={i}
-                      className="flex justify-between items-center bg-muted/40 px-3"
-                    >
-                      {/* spaced-out digits like OTP slots */}
-                      <div className="flex justify-center gap-2 text-lg font-semibold text-foreground">
-                        {g.guess.split("").map((digit, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-block w-2 text-center"
-                          >
-                            {digit}
-                          </span>
-                        ))}
-                      </div>
-
-                      {/* correct count */}
-                      <span
-                        className={
-                          g.correct > 0
-                            ? "text-green-500"
-                            : "text-muted-foreground" +
-                              `text-xs ml-2 font-medium`
-                        }
+              <div className="max-h-48 overflow-y-auto space-y-2 px-1">
+                {myGuesses.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No guesses yet.
+                  </p>
+                ) : (
+                  myGuesses
+                    .slice()
+                    .reverse()
+                    .map((g, i) => (
+                      <div
+                        key={i}
+                        className="flex justify-between items-center bg-muted/40 px-3"
                       >
-                        {g.correct}/4
-                      </span>
-                    </div>
-                  ))
-              )}
+                        <div className="flex justify-center gap-3 text-lg font-semibold text-foreground">
+                          {g.guess.split("").map((digit, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-block w-3 text-center"
+                            >
+                              {digit}
+                            </span>
+                          ))}
+                        </div>
+                        <span className="text-xs text-muted-foreground ml-2 font-medium">
+                          {g.correct}/4
+                        </span>
+                      </div>
+                    ))
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }

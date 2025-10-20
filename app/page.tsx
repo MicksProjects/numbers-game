@@ -128,6 +128,31 @@ export default function PlayPage() {
     }
   }, [handleExitToLobby, roomId])
 
+  // Inside PlayPage component
+  useEffect(() => {
+    const checkExistingRoom = async () => {
+      const { data, error } = await supabase
+        .from("rooms")
+        .select("*")
+        .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
+        .maybeSingle()
+
+      if (error) {
+        console.error("❌ Failed to check existing room:", error)
+        return
+      }
+
+      if (data) {
+        setRoom(data as Room)
+        setRoomId(data.id)
+        setIsHost(data.player1_id === userId)
+        setHasSecret(!!(data.player1_secret || data.player2_secret))
+      }
+    }
+
+    checkExistingRoom()
+  }, [userId])
+
   // Flow
   if (!roomId) return <Lobby onJoin={handleJoin} />
   if (!room) return <p className="text-center mt-10">Connecting...</p>
@@ -135,7 +160,15 @@ export default function PlayPage() {
 
   return (
     <>
-      <MultiplayerGame room={room} userId={userId} />
+      <MultiplayerGame
+        room={room}
+        userId={userId}
+        onLeave={() => {
+          setRoom(undefined)
+          setRoomId(undefined)
+          setHasSecret(false)
+        }}
+      />
 
       {/* Game Over Dialog */}
       <Dialog open={gameOver} onOpenChange={setGameOver}>
