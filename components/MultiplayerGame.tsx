@@ -67,7 +67,7 @@ export function MultiplayerGame({
 
   return (
     <Card className="w-full max-w-sm mx-auto p-5 shadow-lg rounded-2xl">
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
         {/* ===== Turn Indicator ===== */}
         <div className="flex items-center text-center justify-between border-b pb-4">
           <div className="flex items-center justify-center gap-2">
@@ -180,7 +180,14 @@ export function MultiplayerGame({
                       </div>
 
                       {/* correct count */}
-                      <span className="text-xs text-muted-foreground ml-2 font-medium">
+                      <span
+                        className={
+                          g.correct > 0
+                            ? "text-green-500"
+                            : "text-muted-foreground" +
+                              `text-xs ml-2 font-medium`
+                        }
+                      >
                         {g.correct}/4
                       </span>
                     </div>
