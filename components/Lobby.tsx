@@ -5,36 +5,34 @@ import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { supabase } from "@/lib/supabaseClient"
-import { useClientId } from "@/lib/hooks/useClientId"
-import { Loader2 } from "lucide-react"
+import { Loader2, Share2 } from "lucide-react"
 import { toast } from "sonner"
-
-interface Room {
-  id: string
-  room_name: string | null
-  player1_id: string
-  player2_id: string | null
-  created_at: string
-}
+import {
+  createRoom as createRoomService,
+  joinRoom as joinRoomService,
+  fetchAvailableRooms,
+  Room,
+} from "@/lib/services/roomService"
+import { shareRoom } from "@/lib/utils/shareRoom"
+import { HowToPlay } from "@/components/HowToPlay"
 
 export function Lobby({
   onJoin,
+  userId,
 }: {
-  onJoin: (roomId: string, isHost: boolean) => void
+  onJoin: (roomId: string) => void
+  userId: string
 }) {
-  const userId = useClientId()
   const [rooms, setRooms] = useState<Room[]>([])
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [roomName, setRoomName] = useState("")
 
   const fetchRooms = async () => {
-    const { data, error } = await supabase
-      .from("rooms")
-      .select("id, room_name, player1_id, player2_id, created_at")
-      .is("player2_id", null)
-      .order("created_at", { ascending: false })
-    if (!error && data) setRooms(data)
+    const result = await fetchAvailableRooms()
+    if (result.success) {
+      setRooms(result.data)
+    }
   }
 
   useEffect(() => {
@@ -43,7 +41,12 @@ export function Lobby({
       .channel("rooms-lobby")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "rooms" },
+        {
+          event: "*",
+          schema: "public",
+          table: "rooms",
+          filter: "game_state=eq.waiting_for_players",
+        },
         async () => {
           await fetchRooms()
         }
@@ -57,56 +60,44 @@ export function Lobby({
 
   const createRoom = async () => {
     if (!roomName.trim()) {
-      toast.warning("Please enter a room name.")
+      toast.warning("Please enter a room name")
       return
     }
+
     setCreating(true)
-    const { data, error } = await supabase
-      .from("rooms")
-      .insert([{ player1_id: userId, room_name: roomName.trim() }])
-      .select()
-      .single()
+    const result = await createRoomService(userId, roomName)
     setCreating(false)
 
-    if (error) {
-      console.error(error)
-      toast.error("Failed to create room.")
-      return
+    if (result.success) {
+      toast.success("Room created successfully!")
+      onJoin(result.data.id)
+    } else {
+      toast.error(result.error)
     }
-
-    toast.success("Room created successfully!")
-    if (data) onJoin(data.id, true)
   }
 
   const joinRoom = async (roomId: string) => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from("rooms")
-      .update({ player2_id: userId })
-      .eq("id", roomId)
-      .is("player2_id", null)
-      .select()
-      .single()
+    const result = await joinRoomService(roomId, userId)
     setLoading(false)
 
-    if (error) {
-      console.error(error)
-      toast.error("Failed to join room.")
-      return
+    if (result.success) {
+      toast.success("Joined room successfully!")
+      onJoin(roomId)
+    } else {
+      if (result.code === "ROOM_FULL") {
+        toast.info(result.error)
+      } else {
+        toast.error(result.error)
+      }
     }
-    if (!data) {
-      toast.info("Room is already full or no longer available.")
-      return
-    }
-
-    toast.success("Joined room successfully!")
-    onJoin(roomId, false)
   }
 
   return (
     <Card className="w-full max-w-sm mx-auto p-6 text-center gap-0">
-      <CardHeader>
+      <CardHeader className="space-y-3">
         <CardTitle className="text-2xl font-bold">Join a Room</CardTitle>
+        <HowToPlay />
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -144,11 +135,12 @@ export function Lobby({
               ) : (
                 <Button
                   size="sm"
-                  variant="outline"
-                  disabled
-                  className="opacity-50"
+                  variant="default"
+                  onClick={() => shareRoom(room.id, room.room_name)}
+                  className="gap-1.5"
                 >
-                  Your Room
+                  <Share2 className="h-4 w-4" />
+                  Share
                 </Button>
               )}
             </div>

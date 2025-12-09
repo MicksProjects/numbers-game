@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { supabase } from "@/lib/supabaseClient"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -10,8 +9,11 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp"
 import { Badge } from "@/components/ui/badge"
-import { Room } from "@/app/page"
+import { Room, submitGuess } from "@/lib/services/roomService"
 import { toast } from "sonner"
+import { Share2 } from "lucide-react"
+import { shareRoom } from "@/lib/utils/shareRoom"
+import { HowToPlay } from "@/components/HowToPlay"
 
 export function MultiplayerGame({
   room,
@@ -47,112 +49,30 @@ export function MultiplayerGame({
   const makeGuess = async () => {
     if (value.length !== 4 || !myTurn) return
 
-    const opponentSecret = isPlayer1 ? room.player2_secret : room.player1_secret
-    const correct = value
-      .split("")
-      .reduce((acc, d, i) => (d === opponentSecret?.[i] ? acc + 1 : acc), 0)
+    const result = await submitGuess(room, userId, value)
 
-    const guesses = [...myGuesses, { guess: value, correct }]
-    const nextTurn = isPlayer1 ? 2 : 1
-    const winner = correct === 4 ? myNum : null
-
-    await supabase
-      .from("rooms")
-      .update({
-        [`player${myNum}_guesses`]: guesses,
-        turn: nextTurn,
-        winner,
-      })
-      .eq("id", room.id)
+    if (!result.success) {
+      toast.error(result.error)
+      return
+    }
 
     setValue("")
+    // Room update will come via realtime subscription
   }
 
-  const leaveGame = async () => {
-    try {
-      const isHost = room.player1_id === userId
-      const isGuest = room.player2_id === userId
-
-      if (!isHost && !isGuest) return
-
-      let updatePayload: Record<string, unknown> = {}
-
-      // 🔹 Host leaves
-      if (isHost) {
-        if (room.player2_id) {
-          // Promote player2 to host, but reset game state
-          updatePayload = {
-            player1_id: room.player2_id,
-            player2_id: null,
-            player1_secret: null, // reset — new host needs to enter
-            player2_secret: null,
-            player1_guesses: [],
-            player2_guesses: [],
-            turn: 1,
-            winner: null,
-          }
-        } else {
-          // No one else → just clear host
-          updatePayload = { player1_id: null }
-        }
-      }
-
-      // 🔹 Guest leaves
-      if (isGuest) {
-        // Reset game so host can restart
-        updatePayload = {
-          player2_id: null,
-          player1_secret: null,
-          player2_secret: null,
-          player1_guesses: [],
-          player2_guesses: [],
-          turn: 1,
-          winner: null,
-        }
-      }
-
-      // Apply update
-      const { data: updatedRoom, error: updateError } = await supabase
-        .from("rooms")
-        .update(updatePayload)
-        .eq("id", room.id)
-        .select()
-        .single()
-
-      if (updateError) {
-        toast.error("Failed to leave the game.")
-        console.error(updateError)
-        return
-      }
-
-      // 🔹 Delete room if empty
-      if (!updatedRoom.player1_id && !updatedRoom.player2_id) {
-        const { error: deleteError } = await supabase
-          .from("rooms")
-          .delete()
-          .eq("id", room.id)
-        if (deleteError) {
-          toast.error("Failed to delete the room.")
-          return
-        }
-        toast("Room deleted (no players left).")
-      } else if (isHost && updatedRoom.player1_id && !updatedRoom.player2_id) {
-        toast("You left — opponent became new host and game reset.")
-      } else {
-        toast("You left — game reset.")
-      }
-
-      onLeave()
-    } catch (err) {
-      console.error("Leave game failed:", err)
-    }
+  const leaveGame = () => {
+    // Leave logic is now handled by parent component via useRoomManagement hook
+    onLeave()
   }
 
   return (
     <div className="flex flex-col gap-2">
-      <Button onClick={leaveGame} variant="outline" className="w-32">
-        Leave Game
-      </Button>
+      <div className="flex gap-2 justify-between items-center">
+        <Button onClick={leaveGame} variant="outline" size="sm">
+          Leave Game
+        </Button>
+        <HowToPlay />
+      </div>
       <Card className="w-full max-w-sm mx-auto p-4 shadow-lg rounded-2xl relative">
         {/* Leave Game Button */}
 
@@ -230,9 +150,24 @@ export function MultiplayerGame({
               </Button>
             </div>
           ) : (
-            <p className="text-center text-muted-foreground">
-              Waiting for opponent to set their secret...
-            </p>
+            <div className="flex flex-col items-center gap-3">
+              <p className="text-center text-muted-foreground">
+                {room.player2_id
+                  ? "Waiting for opponent to set their secret..."
+                  : "Waiting for opponent to join..."}
+              </p>
+              {!room.player2_id && (
+                <Button
+                  onClick={() => shareRoom(room.id, room.room_name)}
+                  variant="default"
+                  className="w-full gap-2"
+                  size="lg"
+                >
+                  <Share2 className="h-5 w-5" />
+                  Share Room with Friend
+                </Button>
+              )}
+            </div>
           )}
 
           {/* ===== Guess History ===== */}

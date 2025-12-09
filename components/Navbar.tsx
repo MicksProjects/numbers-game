@@ -10,7 +10,12 @@ import {
   NavigationMenuList,
 } from "@/components/ui/navigation-menu"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { useTheme } from "next-themes"
 
@@ -115,6 +120,7 @@ export function SiteNavbar() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-80">
+              <SheetTitle>Menu</SheetTitle>
               <div className="mt-4">
                 <nav className="grid gap-1">
                   {primaryLinks.map((l) => (
