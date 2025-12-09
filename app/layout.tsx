@@ -11,8 +11,10 @@ export default function RootLayout({
   return (
     <>
       <html lang="en" suppressHydrationWarning>
-        <head />
-        <body>
+        <head>
+          <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        </head>
+        <body suppressHydrationWarning>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"

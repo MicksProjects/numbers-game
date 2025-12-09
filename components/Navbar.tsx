@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { useTheme } from "next-themes"
+import Image from "next/image"
 
 type NavLink = { href: string; label: string }
 const primaryLinks: NavLink[] = []
@@ -48,9 +49,8 @@ export function SiteNavbar() {
         <div className="mr-4 flex items-center">
           <Link href="/" className="flex items-center gap-2 font-semibold">
             <span className="inline-flex h-6 w-6 items-center justify-center rounded bg-primary text-primary-foreground text-[11px] font-bold">
-              L
+              <Image src="/logo.png" alt="Logo" width={24} height={24} />
             </span>
-            <span className="hidden sm:inline-block">Logo</span>
           </Link>
         </div>
 

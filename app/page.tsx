@@ -111,17 +111,24 @@ export default function PlayPage() {
             setRoom(urlRoom)
             setRoomId(urlRoom.id)
           } else if (urlRoom.game_state === "waiting_for_players") {
-            // Room is available, actually join it
-            const joinResult = await joinRoomService(urlRoomId, userId)
-            if (joinResult.success) {
-              toast.success("Joined room successfully!")
-              setRoom(joinResult.data)
-              setRoomId(urlRoomId)
+            // Check if room is password protected
+            if (urlRoom.password) {
+              // Password required - user will need to enter it in lobby
+              toast.info("This room requires a password. Enter it to join.")
+              // Don't auto-join, let them go to lobby
             } else {
-              if (joinResult.code === "ROOM_FULL") {
-                toast.info(joinResult.error)
+              // Room is available, actually join it
+              const joinResult = await joinRoomService(urlRoomId, userId)
+              if (joinResult.success) {
+                toast.success("Joined room successfully!")
+                setRoom(joinResult.data)
+                setRoomId(urlRoomId)
               } else {
-                toast.error(joinResult.error)
+                if (joinResult.code === "ROOM_FULL") {
+                  toast.info(joinResult.error)
+                } else {
+                  toast.error(joinResult.error)
+                }
               }
             }
           } else {

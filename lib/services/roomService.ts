@@ -17,6 +17,8 @@ export interface Room {
     | "in_progress"
     | "finished"
   created_at: string
+  password: string | null
+  deleted_at: string | null
 }
 
 export type RoomServiceResult<T> =
@@ -28,7 +30,8 @@ export type RoomServiceResult<T> =
  */
 export async function createRoom(
   hostId: string,
-  roomName: string
+  roomName: string,
+  password?: string
 ): Promise<RoomServiceResult<Room>> {
   const { data, error } = await supabase
     .from("rooms")
@@ -37,6 +40,7 @@ export async function createRoom(
         player1_id: hostId,
         room_name: roomName.trim(),
         game_state: "waiting_for_players",
+        password: password?.trim() || null,
       },
     ])
     .select()
@@ -55,15 +59,25 @@ export async function createRoom(
  */
 export async function joinRoom(
   roomId: string,
-  playerId: string
+  playerId: string,
+  password?: string
 ): Promise<RoomServiceResult<Room>> {
   const { data, error } = await supabase.rpc("join_room", {
     room_id: roomId,
     player_id: playerId,
+    password_attempt: password || null,
   })
 
   if (error) {
     console.error("Failed to join room:", error)
+
+    if (error.message.includes("invalid_password")) {
+      return {
+        success: false,
+        error: "Incorrect password",
+        code: "INVALID_PASSWORD",
+      }
+    }
 
     if (error.message.includes("room_full_or_invalid")) {
       return {
@@ -132,8 +146,11 @@ export async function fetchAvailableRooms(): Promise<
 > {
   const { data, error } = await supabase
     .from("rooms")
-    .select("id, room_name, player1_id, player2_id, game_state, created_at")
+    .select(
+      "id, room_name, player1_id, player2_id, game_state, created_at, password"
+    )
     .eq("game_state", "waiting_for_players")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
 
   if (error) {
@@ -174,6 +191,7 @@ export async function findUserRoom(
     .from("rooms")
     .select("*")
     .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
+    .is("deleted_at", null)
     .maybeSingle()
 
   if (error) {

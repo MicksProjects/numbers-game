@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { supabase } from "@/lib/supabaseClient"
-import { Loader2, Share2 } from "lucide-react"
+import { Loader2, Share2, Lock } from "lucide-react"
 import { toast } from "sonner"
 import {
   createRoom as createRoomService,
@@ -15,6 +15,7 @@ import {
 } from "@/lib/services/roomService"
 import { shareRoom } from "@/lib/utils/shareRoom"
 import { HowToPlay } from "@/components/HowToPlay"
+import { PasswordDialog } from "@/components/PasswordDialog"
 
 export function Lobby({
   onJoin,
@@ -27,6 +28,9 @@ export function Lobby({
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [roomName, setRoomName] = useState("")
+  const [roomPassword, setRoomPassword] = useState("")
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [pendingRoom, setPendingRoom] = useState<Room | null>(null)
 
   const fetchRooms = async () => {
     const result = await fetchAvailableRooms()
@@ -65,31 +69,62 @@ export function Lobby({
     }
 
     setCreating(true)
-    const result = await createRoomService(userId, roomName)
+    const result = await createRoomService(
+      userId,
+      roomName,
+      roomPassword || undefined
+    )
     setCreating(false)
 
     if (result.success) {
-      toast.success("Room created successfully!")
+      const msg = roomPassword
+        ? "Private room created successfully!"
+        : "Room created successfully!"
+      toast.success(msg)
       onJoin(result.data.id)
     } else {
       toast.error(result.error)
     }
   }
 
-  const joinRoom = async (roomId: string) => {
+  const joinRoom = async (roomId: string, password?: string) => {
     setLoading(true)
-    const result = await joinRoomService(roomId, userId)
+    const result = await joinRoomService(roomId, userId, password)
     setLoading(false)
 
     if (result.success) {
       toast.success("Joined room successfully!")
+      setShowPasswordDialog(false)
+      setPendingRoom(null)
       onJoin(roomId)
     } else {
-      if (result.code === "ROOM_FULL") {
+      if (result.code === "INVALID_PASSWORD") {
+        toast.error(result.error)
+        // Keep dialog open for retry
+      } else if (result.code === "ROOM_FULL") {
         toast.info(result.error)
+        setShowPasswordDialog(false)
+        setPendingRoom(null)
       } else {
         toast.error(result.error)
+        setShowPasswordDialog(false)
+        setPendingRoom(null)
       }
+    }
+  }
+
+  const handleRoomClick = (room: Room) => {
+    if (room.password) {
+      setPendingRoom(room)
+      setShowPasswordDialog(true)
+    } else {
+      joinRoom(room.id)
+    }
+  }
+
+  const handlePasswordSubmit = (password: string) => {
+    if (pendingRoom) {
+      joinRoom(pendingRoom.id, password)
     }
   }
 
@@ -114,20 +149,25 @@ export function Lobby({
               key={room.id}
               className="flex justify-between items-center border-b last:border-none py-2 px-1"
             >
-              <div className="text-left">
-                <p className="font-semibold truncate">
-                  {room.room_name || "Unnamed Room"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Host: {room.player1_id?.slice(0, 6)}...
-                </p>
+              <div className="text-left flex items-center gap-2">
+                {room.password && (
+                  <Lock className="h-4 w-4 text-muted-foreground" />
+                )}
+                <div>
+                  <p className="font-semibold truncate">
+                    {room.room_name || "Unnamed Room"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Host: {room.player1_id?.slice(0, 6)}...
+                  </p>
+                </div>
               </div>
 
               {room.player1_id !== userId && room.player2_id !== userId ? (
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => joinRoom(room.id)}
+                  onClick={() => handleRoomClick(room)}
                   disabled={loading}
                 >
                   Join
@@ -154,6 +194,12 @@ export function Lobby({
             value={roomName}
             onChange={(e) => setRoomName(e.target.value)}
           />
+          <Input
+            type="password"
+            placeholder="Password (optional - leave blank for public room)"
+            value={roomPassword}
+            onChange={(e) => setRoomPassword(e.target.value)}
+          />
           <Button
             onClick={createRoom}
             disabled={creating}
@@ -170,6 +216,14 @@ export function Lobby({
           </Button>
         </div>
       </CardContent>
+
+      <PasswordDialog
+        open={showPasswordDialog}
+        onOpenChange={setShowPasswordDialog}
+        onSubmit={handlePasswordSubmit}
+        roomName={pendingRoom?.room_name || ""}
+        loading={loading}
+      />
     </Card>
   )
 }
