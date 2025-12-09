@@ -196,7 +196,7 @@ export function Lobby({
           />
           <Input
             type="password"
-            placeholder="Password (optional - leave blank for public room)"
+            placeholder="Password (optional)"
             value={roomPassword}
             onChange={(e) => setRoomPassword(e.target.value)}
           />
